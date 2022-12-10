@@ -1,0 +1,64 @@
+#!/bin/bash
+# Path to a lockfile.
+LOCKFILE=/tmp/script_lockfile
+
+#Check if exists lockfile then display message and exit
+if [[ -f $LOCKFILE ]]; then
+  echo "script is already locked!" >&2
+  exit 1
+fi
+
+# Create a lockfile. Simple file which indicate if script is running
+touch $LOCKFILE
+
+# Current date/time minus 1 hour
+start_date=`date -d'now-1 hours' +%d/%b/%Y:%H:%M:%S`
+
+# Current date/time
+current_date=`date +%d/%b/%Y:%H:%M:%S`
+
+# This finction output all data from interval 1 hour before current date and current date
+
+function parse(){
+awk ' { if ($4 > $start_date) print }' /var/log/nginx/access.log
+}
+
+function new_hits_with_ip(){
+# Block info 1. Display list ip address with most high hits:
+echo "In last hour there are found top new hits from IP:"
+
+parse | cut -d' ' -f1 | sort -nr | uniq -c | head -n 1 | awk '{print "Hits: "$1", from IP: "$2}' #"Hits: $1 from IP:  $2"
+}
+
+function list_of_urls(){
+# Block 2. Display list of URLs, with top hits:
+echo "In last hour mostly wanted URLs are:"
+
+parse | awk -F\" '{print $2}' | awk '{print $2}' | sort | uniq -c | sort -r | head -n 1 | awk '{print "Most wanted URLs: "$2", count requests: "$1}'
+}
+
+function all_errors_nginx(){
+# Block 3. List all errors in log nginx error.log in last hour:
+echo "List all errors on web server/web applications in last hour:"
+awk -vDate="$(date -u -d'now-1 hours' +"%Y/%m/%d%H%M%S")" ' { if ($1$2 > Date) print $0 }' /var/log/nginx/error.log
+}
+
+function request_code(){
+# Block 4. Display list of requests code with counter:
+echo "In last hour there are receive responce code:"
+parse | cut -d' ' -f9 | sort -nr | uniq -c | awk '{print "Responce code    "$2"   count: "$1}'
+}
+
+# Output report blocks into a file mail.txt
+new_hits_with_ip > mail.txt
+list_of_urls >> mail.txt
+all_errors_nginx >> mail.txt
+request_code >> mail.txt
+
+# Send a email
+echo "The report is done. Now we are sending it to email...."
+
+echo "Good day! In attachment there are file which present nginx stat info between $start_date and $current_date" | mutt -a mail.txt -s "Hourly nginx report" -- hunter1981@yandex.ru
+
+# This trap function remove a lockfile from disk. And remove block on execute this script. Trigger on sig EXIT.
+trap 'rm $LOCKFILE' EXIT
