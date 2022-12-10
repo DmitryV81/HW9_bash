@@ -27,11 +27,11 @@ curl 192.168.50.10/index.html
 curl 192.168.50.10/some_page.html
 ```
 
-Установка требуемого ПО:
+Установка требуемого ПО на сервере:
 
 ```
 sudo yum install epel-release
-sudo yum instll nginx mutt
+sudo yum install nginx mutt
 ```
 
 * Вместо mutt можно использовать любой другой почтовый клиент
